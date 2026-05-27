@@ -23,14 +23,18 @@ import {
   AlertTriangle,
   BarChart3,
   BookOpen,
+  ChevronLeft,
   Database,
   ExternalLink,
   LineChart,
   Moon,
+  Search,
   RefreshCw,
   ShieldCheck,
   Sparkles,
   Sun,
+  TrendingUp,
+  Volume2,
 } from "lucide-react";
 import "./styles.css";
 
@@ -156,49 +160,13 @@ function App() {
 
         {route === "learn" ? <LearnPage learning={analysis?.learning ?? []} /> : null}
         {route === "dashboard" ? (
-          <>
-            <section className="hero">
-              <div>
-                <p className="eyebrow">공시 + 시세 + 재무 신호</p>
-                <h1>오늘 볼 종목을 근거와 위험까지 빠르게 압축합니다</h1>
-              </div>
-              <div className="statusBox">
-                <Database />
-                <span>기본 화면은 핵심 판단만 보여주고, 상세 재무는 별도 화면에서 확인합니다</span>
-              </div>
-            </section>
-
-            <section className="layout">
-              <aside className="sidebar">
-                <div className="sectionTitle">
-                  <span>거래량 TOP 5</span>
-                  <RefreshCw size={16} />
-                </div>
-                <div className="stockList">
-                  {top.map((stock, index) => (
-                    <button
-                      className={`stockButton ${selectedCode === stock.code ? "active" : ""}`}
-                      key={stock.code}
-                      onClick={() => setSelectedCode(stock.code)}
-                    >
-                      <b>{index + 1}</b>
-                      <span>
-                        <strong>{stock.name}</strong>
-                        <small>
-                          {stock.code} · {stock.market}
-                        </small>
-                      </span>
-                      <em>{stock.changeRate.toFixed(2)}%</em>
-                    </button>
-                  ))}
-                </div>
-              </aside>
-
-              <section className="content">
-                {analysis ? <CompactAnalysisView analysis={analysis} loading={loading} /> : <Empty />}
-              </section>
-            </section>
-          </>
+          <HomeDashboardView
+            top={top}
+            selectedCode={selectedCode}
+            setSelectedCode={setSelectedCode}
+            analysis={analysis}
+            loading={loading}
+          />
         ) : null}
         {route === "financial" ? (
           <>
@@ -247,6 +215,194 @@ function App() {
         ) : null}
       </div>
     </main>
+  );
+}
+
+function HomeDashboardView({
+  top,
+  selectedCode,
+  setSelectedCode,
+  analysis,
+  loading,
+}: {
+  top: MarketRow[];
+  selectedCode: string;
+  setSelectedCode: (code: string) => void;
+  analysis: Analysis | null;
+  loading: boolean;
+}) {
+  const selected = analysis?.stock ?? top.find((stock) => stock.code === selectedCode) ?? top[0];
+  const ranking = useMemo(
+    () => [...top].sort((a, b) => b.changeRate - a.changeRate || b.volume - a.volume),
+    [top],
+  );
+  const dataStatus = top.length ? "네이버 금융 공개 페이지 polling 데이터 사용 중" : "무료 공개 데이터 연결 중";
+
+  return (
+    <>
+      <section className="homeHero">
+        <div>
+          <p className="eyebrow">공시 + 시세 + 리포트 + 대중 의견</p>
+          <h1>오늘 볼 종목을 근거와 위험까지 한 번에 압축</h1>
+        </div>
+        <div className="homeSearchBox">
+          <Search size={18} />
+          <span>{dataStatus}</span>
+        </div>
+      </section>
+
+      <section className="homeLayout">
+        <aside className="homeDashboard">
+          <div className="homeSectionHeader">
+            <div>
+              <p className="eyebrow">TOP 5</p>
+              <h2>인기 종목</h2>
+            </div>
+            <TrendingUp size={22} />
+          </div>
+          <div className="homeStockList">
+            {ranking.map((stock, index) => (
+              <button
+                key={stock.code}
+                className={`homeStockCard ${stock.code === selectedCode ? "active" : ""}`}
+                onClick={() => setSelectedCode(stock.code)}
+              >
+                <div className="homeRank">{index + 1}</div>
+                <div className="homeStockMain">
+                  <strong>{stock.name}</strong>
+                  <span>
+                    {stock.code} · {stock.market}
+                  </span>
+                </div>
+                <div className="homeStockMetric">
+                  <strong>{signedPct(stock.changeRate)}</strong>
+                  <span>거래량 {compactNumber(stock.volume)}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <section className="homeDetail">
+          <button className="homeBackButton" onClick={() => top[0] && setSelectedCode(top[0].code)}>
+            <ChevronLeft size={16} />
+            대시보드
+          </button>
+
+          {analysis && selected ? (
+            <>
+              <div className="homeDetailHero">
+                <div>
+                  <p className="eyebrow">{selected.market}</p>
+                  <h2>{selected.name}</h2>
+                  <p className="homePrice">
+                    {selected.price.toLocaleString("ko-KR")}원 <span>{signedPct(selected.changeRate)}</span>
+                  </p>
+                </div>
+                <HomeScoreRing value={scoreFromGrade(analysis.grade)} label="신뢰도" />
+              </div>
+
+              <p className="homeVerdict">{loading ? "분석 갱신 중..." : analysis.summary}</p>
+
+              <div className="homeMetricGrid">
+                <HomeMetric icon={<Volume2 />} label="거래량" value={compactNumber(selected.volume)} tone="info" />
+                <HomeMetric icon={<TrendingUp />} label="등락률" value={signedPct(selected.changeRate)} tone="good" />
+                <HomeMetric icon={<AlertTriangle />} label="종합 등급" value={analysis.grade} tone="danger" />
+                <HomeMetric icon={<ShieldCheck />} label="정확성" value={`${analysis.metrics.length}개 지표`} tone="safe" />
+              </div>
+
+              <div className="homeAnalysisGrid">
+                <HomePanel icon={<Database />} title="DART 재무 요약">
+                  <HomeFact label="최근 매출액" value={money(analysis.financial?.metrics.revenue)} />
+                  <HomeFact label="최근 영업이익" value={money(analysis.financial?.metrics.operatingIncome)} />
+                  <HomeFact label="최근 순이익" value={money(analysis.financial?.metrics.netIncome)} />
+                </HomePanel>
+
+                <HomePanel icon={<Activity />} title="시세 API 분석">
+                  <HomeFact label="가격 데이터" value={`${analysis.technical?.prices.length ?? 0}개 일봉`} />
+                  <HomeFact label="5/20/60일선" value={`${num(analysis.technical?.indicators.ma5)} / ${num(analysis.technical?.indicators.ma20)} / ${num(analysis.technical?.indicators.ma60)}`} />
+                  <HomeFact label="RSI / MACD" value={`${pct(analysis.technical?.indicators.rsi14)} / ${num(analysis.technical?.indicators.macdHistogram, 1)}`} />
+                </HomePanel>
+
+                <HomePanel icon={<BarChart3 />} title="핵심 지표">
+                  {analysis.metrics.slice(0, 3).map((metric) => (
+                    <article className="homeCompactItem" key={metric.label}>
+                      <div>
+                        <strong>{metric.label}</strong>
+                        <span>{metric.value}</span>
+                      </div>
+                      <p>{metric.description}</p>
+                    </article>
+                  ))}
+                </HomePanel>
+
+                <HomePanel icon={<ShieldCheck />} title="종합 체크리스트">
+                  {analysis.checklist.slice(0, 3).map((item) => (
+                    <article className="homeCompactItem" key={item.label}>
+                      <div>
+                        <strong>{item.label}</strong>
+                        <span>{item.passed ? "통과" : "확인"}</span>
+                      </div>
+                      <p>{item.detail}</p>
+                    </article>
+                  ))}
+                </HomePanel>
+              </div>
+
+              <a className="homeDetailEntry" href="#/financial">
+                <span>
+                  <strong>재무정보 자세히 보기</strong>
+                  <small>5개년 수치 테이블과 인터랙티브 그래프를 확인합니다</small>
+                </span>
+                <ExternalLink size={18} />
+              </a>
+            </>
+          ) : (
+            <Empty />
+          )}
+        </section>
+      </section>
+    </>
+  );
+}
+
+function HomeScoreRing({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="homeScoreRing" style={{ "--score": `${value * 3.6}deg` } as React.CSSProperties}>
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function HomeMetric({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: string }) {
+  return (
+    <article className={`homeMetric ${tone}`}>
+      {icon}
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function HomePanel({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <section className="homePanel">
+      <div className="homePanelTitle">
+        {icon}
+        <h3>{title}</h3>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function HomeFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="homeFact">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -803,6 +959,23 @@ function num(value: number | null | undefined, digits = 0) {
 
 function pct(value: number | null | undefined) {
   return value === null || value === undefined ? "미확인" : `${value.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}%`;
+}
+
+function signedPct(value: number) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function compactNumber(value: number) {
+  if (Math.abs(value) >= 1_0000_0000) return `${Math.round(value / 1_0000_0000).toLocaleString("ko-KR")}억`;
+  if (Math.abs(value) >= 1_0000) return `${Math.round(value / 1_0000).toLocaleString("ko-KR")}만`;
+  return value.toLocaleString("ko-KR");
+}
+
+function scoreFromGrade(grade: Analysis["grade"]) {
+  if (grade === "우수") return 88;
+  if (grade === "양호") return 76;
+  if (grade === "중립") return 62;
+  return 45;
 }
 
 function formatTime(value?: string) {
