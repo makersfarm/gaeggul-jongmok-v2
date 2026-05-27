@@ -6,6 +6,7 @@ import {
   BarChart3,
   BookOpen,
   Database,
+  ExternalLink,
   LineChart,
   Moon,
   RefreshCw,
@@ -73,7 +74,7 @@ type Analysis = {
 
 function App() {
   const [dark, setDark] = useState(false);
-  const [route, setRoute] = useState(location.hash === "#/learn" ? "learn" : "dashboard");
+  const [route, setRoute] = useState<Route>(getRoute());
   const [market, setMarket] = useState<MarketRow[]>([]);
   const [selectedCode, setSelectedCode] = useState("005930");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -81,7 +82,7 @@ function App() {
   const top = useMemo(() => market.slice(0, 5), [market]);
 
   useEffect(() => {
-    const onHash = () => setRoute(location.hash === "#/learn" ? "learn" : "dashboard");
+    const onHash = () => setRoute(getRoute());
     addEventListener("hashchange", onHash);
     return () => removeEventListener("hashchange", onHash);
   }, []);
@@ -119,6 +120,10 @@ function App() {
               <BarChart3 size={16} />
               분석
             </a>
+            <a className={route === "financial" ? "active" : ""} href="#/financial">
+              <LineChart size={16} />
+              재무정보
+            </a>
             <a className={route === "learn" ? "active" : ""} href="#/learn">
               <BookOpen size={16} />
               지표 학습
@@ -134,8 +139,53 @@ function App() {
           <>
             <section className="hero">
               <div>
+                <p className="eyebrow">공시 + 시세 + 재무 신호</p>
+                <h1>오늘 볼 종목을 근거와 위험까지 빠르게 압축합니다</h1>
+              </div>
+              <div className="statusBox">
+                <Database />
+                <span>기본 화면은 핵심 판단만 보여주고, 상세 재무는 별도 화면에서 확인합니다</span>
+              </div>
+            </section>
+
+            <section className="layout">
+              <aside className="sidebar">
+                <div className="sectionTitle">
+                  <span>거래량 TOP 5</span>
+                  <RefreshCw size={16} />
+                </div>
+                <div className="stockList">
+                  {top.map((stock, index) => (
+                    <button
+                      className={`stockButton ${selectedCode === stock.code ? "active" : ""}`}
+                      key={stock.code}
+                      onClick={() => setSelectedCode(stock.code)}
+                    >
+                      <b>{index + 1}</b>
+                      <span>
+                        <strong>{stock.name}</strong>
+                        <small>
+                          {stock.code} · {stock.market}
+                        </small>
+                      </span>
+                      <em>{stock.changeRate.toFixed(2)}%</em>
+                    </button>
+                  ))}
+                </div>
+              </aside>
+
+              <section className="content">
+                {analysis ? <CompactAnalysisView analysis={analysis} loading={loading} /> : <Empty />}
+              </section>
+            </section>
+          </>
+        ) : null}
+        {route === "financial" ? (
+          <>
+            <section className="hero">
+              <div>
                 <p className="eyebrow">5개년 DART 재무제표 + 모델링 기반 기술지표</p>
-                <h1>성장성, 수익성, 안정성, 추세를 한 화면에서 비교합니다</h1>
+                <h1>성장성, 수익성, 안정성, 추세를 분리해서 봅니다</h1>
               </div>
               <div className="statusBox">
                 <Database />
@@ -170,7 +220,7 @@ function App() {
               </aside>
 
               <section className="content">
-                {analysis ? <AnalysisView analysis={analysis} loading={loading} /> : <Empty />}
+                {analysis ? <FinancialAnalysisView analysis={analysis} loading={loading} /> : <Empty />}
               </section>
             </section>
           </>
@@ -180,7 +230,15 @@ function App() {
   );
 }
 
-function AnalysisView({ analysis, loading }: { analysis: Analysis; loading: boolean }) {
+type Route = "dashboard" | "financial" | "learn";
+
+function getRoute(): Route {
+  if (location.hash === "#/learn") return "learn";
+  if (location.hash === "#/financial") return "financial";
+  return "dashboard";
+}
+
+function CompactAnalysisView({ analysis, loading }: { analysis: Analysis; loading: boolean }) {
   return (
     <>
       <div className="summaryPanel">
@@ -196,15 +254,8 @@ function AnalysisView({ analysis, loading }: { analysis: Analysis; loading: bool
 
       <p className="summaryText">{loading ? "분석 갱신 중..." : analysis.summary}</p>
 
-      <section className="chartGrid">
-        {analysis.chartSeries.map((series) => (
-          <ChartCard series={series} key={series.title} />
-        ))}
-        <TechnicalChart analysis={analysis} />
-      </section>
-
       <section className="metricGrid">
-        {analysis.metrics.map((metric) => (
+        {analysis.metrics.slice(0, 4).map((metric) => (
           <article className={`metric ${metric.status}`} key={metric.label}>
             <span>{metric.label}</span>
             <strong>{metric.value}</strong>
@@ -212,6 +263,42 @@ function AnalysisView({ analysis, loading }: { analysis: Analysis; loading: bool
           </article>
         ))}
       </section>
+
+      <a className="detailEntry" href="#/financial">
+        <span>
+          <strong>재무정보 자세히 보기</strong>
+          <small>5개년 수치 테이블, 재무·기술 그래프, 체크리스트를 상세 화면에서 봅니다</small>
+        </span>
+        <ExternalLink size={18} />
+      </a>
+    </>
+  );
+}
+
+function FinancialAnalysisView({ analysis, loading }: { analysis: Analysis; loading: boolean }) {
+  return (
+    <>
+      <CompactAnalysisView analysis={analysis} loading={loading} />
+
+      <section className="financialTablePanel">
+        <div className="sectionTitle">
+          <span>5개년 수치 데이터</span>
+          <LineChart size={16} />
+        </div>
+        <FinancialTrendTable trend={analysis.financialTrend} />
+      </section>
+
+      <ChartExplorer
+        title="재무 추세 그래프"
+        description="성장성, 수익성, 안정성 항목을 선택하면 오른쪽 그래프가 전환됩니다."
+        series={analysis.chartSeries}
+      />
+
+      <ChartExplorer
+        title="기술 추세 그래프"
+        description="가격 흐름과 일봉 기반 보조 지표는 재무 그래프와 분리해서 봅니다."
+        series={[makeTechnicalSeries(analysis)]}
+      />
 
       <section className="detailGrid">
         <Panel icon={<LineChart />} title="5개년 재무제표 핵심 계정">
@@ -248,6 +335,80 @@ function AnalysisView({ analysis, loading }: { analysis: Analysis; loading: bool
         ))}
       </section>
     </>
+  );
+}
+
+function FinancialTrendTable({ trend }: { trend: Analysis["financialTrend"] }) {
+  const rows = [
+    { key: "revenue", label: "매출액", format: money },
+    { key: "operatingIncome", label: "영업이익", format: money },
+    { key: "netIncome", label: "순이익", format: money },
+    { key: "operatingMargin", label: "영업이익률", format: pct },
+    { key: "roe", label: "ROE", format: pct },
+    { key: "debtRatio", label: "부채비율", format: pct },
+    { key: "roicProxy", label: "ROIC 근사", format: pct },
+  ];
+
+  if (!trend.length) return <div className="emptyTable">5개년 재무 데이터가 아직 수집되지 않았습니다.</div>;
+
+  return (
+    <div className="tableWrap">
+      <table className="financialTable">
+        <thead>
+          <tr>
+            <th>항목</th>
+            {trend.map((point) => (
+              <th key={String(point.year)}>{point.year}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key}>
+              <th>{row.label}</th>
+              {trend.map((point) => (
+                <td key={`${row.key}-${String(point.year)}`}>
+                  {row.format(point[row.key] as number | null | undefined)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ChartExplorer({
+  title,
+  description,
+  series,
+}: {
+  title: string;
+  description: string;
+  series: ChartSeries[];
+}) {
+  const [active, setActive] = useState(0);
+  const selected = series[Math.min(active, series.length - 1)];
+
+  return (
+    <section className="chartExplorer">
+      <div className="sectionTitle">
+        <span>{title}</span>
+        <small>{description}</small>
+      </div>
+      <div className="chartSwitch">
+        <div className="chartTabs">
+          {series.map((item, index) => (
+            <button className={index === active ? "active" : ""} key={item.title} onClick={() => setActive(index)}>
+              <strong>{item.title}</strong>
+              <span>{item.lines.map((line) => line.label).join(" · ")}</span>
+            </button>
+          ))}
+        </div>
+        {selected ? <ChartCard series={selected} /> : <div className="emptyTable">표시할 그래프가 없습니다.</div>}
+      </div>
+    </section>
   );
 }
 
@@ -307,19 +468,19 @@ function ChartCard({ series }: { series: ChartSeries }) {
 }
 
 function TechnicalChart({ analysis }: { analysis: Analysis }) {
+  return <ChartCard series={makeTechnicalSeries(analysis)} />;
+}
+
+function makeTechnicalSeries(analysis: Analysis): ChartSeries {
   const prices = analysis.technical?.prices.slice(-80) ?? [];
   const labels = prices.map((point) => point.date.slice(5));
   const closes = prices.map((point) => point.close);
-  return (
-    <ChartCard
-      series={{
-        title: "최근 80거래일 종가",
-        unit: "price",
-        labels,
-        lines: [{ label: "종가", values: closes }],
-      }}
-    />
-  );
+  return {
+    title: "최근 80거래일 종가",
+    unit: "price",
+    labels,
+    lines: [{ label: "종가", values: closes }],
+  };
 }
 
 function LearnPage({ learning }: { learning: LearningItem[] }) {

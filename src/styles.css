@@ -248,6 +248,7 @@ main {
 .fact span,
 .summaryPanel p,
 .checkPanel p,
+.detailEntry small,
 .learnCard small,
 .learnCard p {
   color: var(--muted);
@@ -384,6 +385,135 @@ main {
   color: var(--danger);
 }
 
+.detailEntry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.detailEntry span {
+  display: grid;
+  gap: 3px;
+}
+
+.detailEntry svg {
+  color: var(--brand);
+  flex: 0 0 auto;
+}
+
+.financialTablePanel,
+.chartExplorer {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.financialTablePanel .sectionTitle,
+.chartExplorer .sectionTitle {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.chartExplorer .sectionTitle {
+  justify-content: flex-start;
+  flex-direction: column;
+}
+
+.chartExplorer .sectionTitle small {
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.financialTable {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.financialTable th,
+.financialTable td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.financialTable th:first-child,
+.financialTable td:first-child {
+  text-align: left;
+}
+
+.financialTable thead th {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.financialTable tbody th {
+  color: var(--text);
+}
+
+.emptyTable {
+  padding: 24px;
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--muted);
+  text-align: center;
+  font-weight: 800;
+}
+
+.chartSwitch {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.chartTabs {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.chartTabs button {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chartTabs button.active {
+  border-color: var(--brand);
+  box-shadow: inset 4px 0 0 var(--brand);
+}
+
+.chartTabs span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
 .detailGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -487,6 +617,7 @@ main {
   .layout,
   .detailGrid,
   .chartGrid,
+  .chartSwitch,
   .learnGrid {
     grid-template-columns: 1fr;
   }
