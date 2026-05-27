@@ -25,6 +25,11 @@ export type FinancialMetrics = {
   netMargin: number | null;
   debtRatio: number | null;
   roe: number | null;
+  investedCapital: number | null;
+  roiProxy: number | null;
+  roicProxy: number | null;
+  ebitProxy: number | null;
+  ebitdaProxy: number | null;
 };
 
 export type FinancialSnapshot = {
@@ -57,18 +62,71 @@ export type TechnicalSnapshot = {
     ma5: number | null;
     ma20: number | null;
     ma60: number | null;
+    ma120: number | null;
     v25: number | null;
+    volumeRatio25: number | null;
     support20: number | null;
     resistance20: number | null;
+    support60: number | null;
+    resistance60: number | null;
+    rsi14: number | null;
+    macd: number | null;
+    macdSignal: number | null;
+    macdHistogram: number | null;
+    bollingerUpper: number | null;
+    bollingerMiddle: number | null;
+    bollingerLower: number | null;
+    volatility20: number | null;
+    trendScore: number | null;
   };
+};
+
+export type TrendPoint = {
+  year: string;
+  revenue: number | null;
+  operatingIncome: number | null;
+  netIncome: number | null;
+  operatingMargin: number | null;
+  netMargin: number | null;
+  roe: number | null;
+  debtRatio: number | null;
+  roiProxy: number | null;
+  roicProxy: number | null;
+  revenueGrowth: number | null;
+  operatingIncomeGrowth: number | null;
+  netIncomeGrowth: number | null;
+  roeChange: number | null;
+  operatingMarginChange: number | null;
+};
+
+export type LearningItem = {
+  key: string;
+  title: string;
+  formula: string;
+  beginner: string;
+  interpretation: string;
+  caution: string;
+};
+
+export type ChartSeries = {
+  title: string;
+  unit: "money" | "percent" | "price" | "volume";
+  lines: {
+    label: string;
+    values: (number | null)[];
+  }[];
+  labels: string[];
 };
 
 export type StockAnalysis = {
   stock: MarketRow;
   financial: FinancialSnapshot | null;
+  financialTrend: TrendPoint[];
   technical: TechnicalSnapshot | null;
   grade: "우수" | "양호" | "중립" | "주의";
   summary: string;
+  chartSeries: ChartSeries[];
+  learning: LearningItem[];
   metrics: {
     label: string;
     value: string;

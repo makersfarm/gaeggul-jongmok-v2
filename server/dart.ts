@@ -33,11 +33,10 @@ export async function getCorpCodeMap() {
   return rows;
 }
 
-export async function getFinancialSnapshot(stockCode: string): Promise<FinancialSnapshot | null> {
-  const year = String(new Date().getFullYear() - 1);
+export async function getFinancialSnapshot(stockCode: string, year = String(new Date().getFullYear() - 1)): Promise<FinancialSnapshot | null> {
   const path = cachePath("dart", "fundamentals", `${stockCode}-${year}.json`);
   const cached = readJsonCache<FinancialSnapshot>(path);
-  if (cached) return cached;
+  if (cached?.metrics && "roicProxy" in cached.metrics) return cached;
 
   const apiKey = process.env.DART_API_KEY;
   if (!apiKey) return null;
@@ -58,6 +57,9 @@ export async function getFinancialSnapshot(stockCode: string): Promise<Financial
   const assets = account("자산총계");
   const liabilities = account("부채총계");
   const equity = account("자본총계");
+  const investedCapital = equity !== null && liabilities !== null ? equity + liabilities : null;
+  const ebitProxy = operatingIncome;
+  const ebitdaProxy = operatingIncome;
 
   const snapshot: FinancialSnapshot = {
     source: "opendart-fnlttSinglAcnt",
@@ -78,9 +80,21 @@ export async function getFinancialSnapshot(stockCode: string): Promise<Financial
       netMargin: ratio(netIncome, revenue),
       debtRatio: ratio(liabilities, equity),
       roe: ratio(netIncome, equity),
+      investedCapital,
+      roiProxy: ratio(netIncome, assets),
+      roicProxy: ratio(operatingIncome, investedCapital),
+      ebitProxy,
+      ebitdaProxy,
     },
   };
 
   writeJsonCache(path, snapshot);
   return snapshot;
+}
+
+export async function getFinancialTrend(stockCode: string, years = 5): Promise<FinancialSnapshot[]> {
+  const latestYear = new Date().getFullYear() - 1;
+  const targets = Array.from({ length: years }, (_, index) => String(latestYear - index));
+  const snapshots = await Promise.all(targets.map((year) => getFinancialSnapshot(stockCode, year)));
+  return snapshots.filter((snapshot): snapshot is FinancialSnapshot => Boolean(snapshot)).sort((a, b) => Number(a.year) - Number(b.year));
 }
