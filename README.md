@@ -10,6 +10,7 @@
 - `server/analysis.ts`: 성장성, 수익성, 효율성, 안정성, 기술지표 분석 결과 생성
 - `src/main.tsx`: 분석 그래프와 지표 학습 라우트 렌더링
 - `supabase/schema.sql`: DB 전환용 테이블 스키마
+- `scripts/seed-supabase.mjs`: KOSPI/KOSDAQ 전체 종목, 최신 시세, 5개년 압축 재무지표 Supabase seed
 
 ## 저장 파일
 
@@ -34,6 +35,42 @@ npm run dev
 ```
 
 `DART_API_KEY`를 `.env`에 넣으면 OpenDART 재무제표 수집이 활성화됩니다.
+
+## Supabase seed 정책
+
+무료 플랜 용량을 지키기 위해 Supabase에는 얇은 테이블만 저장합니다.
+
+- `stocks`: 종목코드, 이름, 시장, DART corp code
+- `latest_quotes`: 최신 가격, 등락률, 거래량, 랭킹
+- `financial_metrics`: 5개년 사업보고서의 핵심 지표만 저장
+- `analysis_cache`: 만료 시간이 있는 분석 결과 캐시
+
+저장하지 않는 것:
+
+- DART 원천 계정 전체 JSON
+- 전종목 일봉 히스토리
+- 뉴스/리포트 원문
+
+일봉 히스토리는 사용자가 종목을 클릭할 때 lazy-load하고 로컬/edge cache에만 둡니다.
+
+```bash
+# Supabase SQL editor에서 supabase/schema.sql 적용 후 실행
+npm run db:seed:kospi
+
+# KOSPI+KOSDAQ 전체까지 확장
+npm run db:seed:all
+
+# 재무 선적재 없이 전체 최신 시세/종목만 갱신
+npm run db:seed:quotes
+```
+
+필요 환경변수:
+
+```bash
+DART_API_KEY=
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+```
 
 ## 주의
 

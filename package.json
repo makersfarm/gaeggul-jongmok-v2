@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "db:seed:kospi": "node scripts/seed-supabase.mjs --market KOSPI --years 5",
+    "db:seed:all": "node scripts/seed-supabase.mjs --market ALL --years 5",
+    "db:seed:quotes": "node scripts/seed-supabase.mjs --market ALL --skip-financials"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.19",
