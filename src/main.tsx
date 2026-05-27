@@ -339,6 +339,7 @@ function FinancialAnalysisView({ analysis, loading }: { analysis: Analysis; load
 }
 
 function FinancialTrendTable({ trend }: { trend: Analysis["financialTrend"] }) {
+  const latestIndex = trend.length - 1;
   const rows = [
     { key: "revenue", label: "매출액", format: money },
     { key: "operatingIncome", label: "영업이익", format: money },
@@ -357,8 +358,10 @@ function FinancialTrendTable({ trend }: { trend: Analysis["financialTrend"] }) {
         <thead>
           <tr>
             <th>항목</th>
-            {trend.map((point) => (
-              <th key={String(point.year)}>{point.year}</th>
+            {trend.map((point, index) => (
+              <th className={index === latestIndex ? "latestYear" : ""} key={String(point.year)}>
+                {point.year}
+              </th>
             ))}
           </tr>
         </thead>
@@ -366,8 +369,8 @@ function FinancialTrendTable({ trend }: { trend: Analysis["financialTrend"] }) {
           {rows.map((row) => (
             <tr key={row.key}>
               <th>{row.label}</th>
-              {trend.map((point) => (
-                <td key={`${row.key}-${String(point.year)}`}>
+              {trend.map((point, index) => (
+                <td className={index === latestIndex ? "latestYear" : ""} key={`${row.key}-${String(point.year)}`}>
                   {row.format(point[row.key] as number | null | undefined)}
                 </td>
               ))}

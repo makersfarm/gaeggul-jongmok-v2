@@ -448,9 +448,15 @@ main {
 .financialTable th,
 .financialTable td {
   padding: 11px 10px;
+  border-left: 1px solid color-mix(in srgb, var(--line) 58%, transparent);
   border-bottom: 1px solid var(--line);
   text-align: right;
   white-space: nowrap;
+}
+
+.financialTable th:first-child,
+.financialTable td:first-child {
+  border-left: 0;
 }
 
 .financialTable th:first-child,
@@ -465,6 +471,15 @@ main {
 
 .financialTable tbody th {
   color: var(--text);
+}
+
+.financialTable .latestYear {
+  color: var(--text);
+  font-weight: 900;
+}
+
+.financialTable td.latestYear {
+  background: color-mix(in srgb, var(--soft) 58%, transparent);
 }
 
 .emptyTable {
