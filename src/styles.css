@@ -324,20 +324,56 @@ main {
   margin: 0 0 10px;
 }
 
-.chartCard svg {
+.echartsCanvas,
+.tradingCanvas {
   width: 100%;
-  min-height: 190px;
-  overflow: visible;
+  height: 320px;
 }
 
-.chartCard line {
-  stroke: var(--line);
+.tradingChartWrap {
+  position: relative;
+  min-height: 320px;
 }
 
-.chartCard text {
-  fill: var(--muted);
-  font-size: 11px;
-  text-anchor: middle;
+.chartHoverTooltip {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  max-width: min(260px, calc(100% - 24px));
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14);
+  pointer-events: none;
+  font-size: 12px;
+}
+
+.chartHoverTooltip strong {
+  font-size: 13px;
+}
+
+.chartHoverTooltip span {
+  color: var(--muted);
+}
+
+.echartsTooltip {
+  display: grid;
+  gap: 6px;
+  min-width: 170px;
+}
+
+.echartsTooltip > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.echartsTooltip b {
+  color: var(--text);
 }
 
 .legend {

@@ -1,5 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { LineChart as EchartsLineChart } from "echarts/charts";
+import {
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+} from "echarts/components";
+import * as echarts from "echarts/core";
+import { CanvasRenderer } from "echarts/renderers";
+import {
+  ColorType,
+  createChart,
+  CrosshairMode,
+  HistogramSeries,
+  LineSeries,
+  type IChartApi,
+  type MouseEventParams,
+  type Time,
+} from "lightweight-charts";
 import {
   Activity,
   AlertTriangle,
@@ -15,6 +33,8 @@ import {
   Sun,
 } from "lucide-react";
 import "./styles.css";
+
+echarts.use([EchartsLineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);
 
 type MarketRow = {
   code: string;
@@ -220,7 +240,7 @@ function App() {
               </aside>
 
               <section className="content">
-                {analysis ? <FinancialAnalysisView analysis={analysis} loading={loading} /> : <Empty />}
+                {analysis ? <FinancialAnalysisView analysis={analysis} loading={loading} dark={dark} /> : <Empty />}
               </section>
             </section>
           </>
@@ -275,7 +295,7 @@ function CompactAnalysisView({ analysis, loading }: { analysis: Analysis; loadin
   );
 }
 
-function FinancialAnalysisView({ analysis, loading }: { analysis: Analysis; loading: boolean }) {
+function FinancialAnalysisView({ analysis, loading, dark }: { analysis: Analysis; loading: boolean; dark: boolean }) {
   return (
     <>
       <CompactAnalysisView analysis={analysis} loading={loading} />
@@ -292,13 +312,10 @@ function FinancialAnalysisView({ analysis, loading }: { analysis: Analysis; load
         title="재무 추세 그래프"
         description="성장성, 수익성, 안정성 항목을 선택하면 오른쪽 그래프가 전환됩니다."
         series={analysis.chartSeries}
+        dark={dark}
       />
 
-      <ChartExplorer
-        title="기술 추세 그래프"
-        description="가격 흐름과 일봉 기반 보조 지표는 재무 그래프와 분리해서 봅니다."
-        series={[makeTechnicalSeries(analysis)]}
-      />
+      <TechnicalChartExplorer analysis={analysis} dark={dark} />
 
       <section className="detailGrid">
         <Panel icon={<LineChart />} title="5개년 재무제표 핵심 계정">
@@ -386,10 +403,12 @@ function ChartExplorer({
   title,
   description,
   series,
+  dark,
 }: {
   title: string;
   description: string;
   series: ChartSeries[];
+  dark: boolean;
 }) {
   const [active, setActive] = useState(0);
   const selected = series[Math.min(active, series.length - 1)];
@@ -409,55 +428,73 @@ function ChartExplorer({
             </button>
           ))}
         </div>
-        {selected ? <ChartCard series={selected} /> : <div className="emptyTable">표시할 그래프가 없습니다.</div>}
+        {selected ? <FinancialChartCard series={selected} dark={dark} /> : <div className="emptyTable">표시할 그래프가 없습니다.</div>}
       </div>
     </section>
   );
 }
 
-function ChartCard({ series }: { series: ChartSeries }) {
-  const values = series.lines.flatMap((line) => line.values).filter((value): value is number => value !== null);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
+function FinancialChartCard({ series, dark }: { series: ChartSeries; dark: boolean }) {
+  const ref = useRef<HTMLDivElement | null>(null);
   const colors = ["#0f766e", "#2563eb", "#dc2626", "#7c3aed"];
-  const width = 320;
-  const height = 190;
-  const left = 34;
-  const right = 14;
-  const top = 18;
-  const bottom = 30;
-  const step = (width - left - right) / Math.max(series.labels.length - 1, 1);
-  const point = (value: number | null, index: number) => {
-    if (value === null) return null;
-    const x = left + step * index;
-    const y = top + (1 - (value - min) / range) * (height - top - bottom);
-    return `${x},${y}`;
-  };
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const style = getComputedStyle(ref.current);
+    const chart = echarts.init(ref.current, undefined, { renderer: "canvas" });
+    chart.setOption({
+      color: colors,
+      grid: { left: 42, right: 18, top: 34, bottom: 34, containLabel: true },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: { type: "cross" },
+        backgroundColor: style.getPropertyValue("--surface").trim(),
+        borderColor: style.getPropertyValue("--line").trim(),
+        textStyle: { color: style.getPropertyValue("--text").trim() },
+        formatter: (params: unknown) => formatEchartsTooltip(series, params),
+      },
+      legend: {
+        top: 0,
+        right: 0,
+        textStyle: { color: style.getPropertyValue("--muted").trim(), fontWeight: 700 },
+      },
+      xAxis: {
+        type: "category",
+        boundaryGap: false,
+        data: series.labels,
+        axisLine: { lineStyle: { color: style.getPropertyValue("--line").trim() } },
+        axisLabel: { color: style.getPropertyValue("--muted").trim(), formatter: (value: string) => value.slice(2) },
+      },
+      yAxis: {
+        type: "value",
+        axisLabel: {
+          color: style.getPropertyValue("--muted").trim(),
+          formatter: (value: number) => compactChartValue(value, series.unit),
+        },
+        splitLine: { lineStyle: { color: style.getPropertyValue("--line").trim() } },
+      },
+      series: series.lines.map((line) => ({
+        name: line.label,
+        type: "line",
+        smooth: true,
+        showSymbol: true,
+        symbolSize: 7,
+        emphasis: { focus: "series" },
+        data: line.values,
+      })),
+    });
+    const resize = () => chart.resize();
+    window.addEventListener("resize", resize);
+    return () => {
+      window.removeEventListener("resize", resize);
+      chart.dispose();
+    };
+  }, [series, dark]);
 
   return (
     <article className="chartCard">
       <h3>{series.title}</h3>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={series.title}>
-        <line x1={left} y1={height - bottom} x2={width - right} y2={height - bottom} />
-        <line x1={left} y1={top} x2={left} y2={height - bottom} />
-        {series.lines.map((line, lineIndex) => (
-          <polyline
-            key={line.label}
-            points={line.values.map(point).filter(Boolean).join(" ")}
-            fill="none"
-            stroke={colors[lineIndex % colors.length]}
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ))}
-        {series.labels.map((label, index) => (
-          <text x={left + step * index} y={height - 8} key={label}>
-            {label.slice(2)}
-          </text>
-        ))}
-      </svg>
+      <div className="echartsCanvas" ref={ref} aria-label={series.title} />
       <div className="legend">
         {series.lines.map((line, index) => (
           <span key={line.label}>
@@ -470,8 +507,168 @@ function ChartCard({ series }: { series: ChartSeries }) {
   );
 }
 
-function TechnicalChart({ analysis }: { analysis: Analysis }) {
-  return <ChartCard series={makeTechnicalSeries(analysis)} />;
+function TechnicalChartExplorer({ analysis, dark }: { analysis: Analysis; dark: boolean }) {
+  const series = makeTechnicalSeries(analysis);
+  return (
+    <section className="chartExplorer">
+      <div className="sectionTitle">
+        <span>기술 추세 그래프</span>
+        <small>마우스를 올리면 해당 거래일의 종가, 거래량, 이동평균, RSI를 함께 봅니다.</small>
+      </div>
+      <div className="chartSwitch">
+        <div className="chartTabs">
+          <button className="active">
+            <strong>{series.title}</strong>
+            <span>종가 · 거래량 · MA20 · MA60 · RSI</span>
+          </button>
+        </div>
+        <TechnicalTradingChart analysis={analysis} dark={dark} />
+      </div>
+    </section>
+  );
+}
+
+type TechnicalHover = {
+  x: number;
+  y: number;
+  date: string;
+  close: number | null;
+  volume: number | null;
+  ma20: number | null;
+  ma60: number | null;
+  rsi14: number | null;
+};
+
+function TechnicalTradingChart({ analysis, dark }: { analysis: Analysis; dark: boolean }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const [hover, setHover] = useState<TechnicalHover | null>(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const style = getComputedStyle(ref.current);
+    const prices = analysis.technical?.prices.slice(-80) ?? [];
+    const indicators = buildTechnicalOverlay(prices);
+    const chart = createChart(ref.current, {
+      autoSize: true,
+      height: 320,
+      layout: {
+        background: { type: ColorType.Solid, color: style.getPropertyValue("--surface").trim() },
+        textColor: style.getPropertyValue("--muted").trim(),
+      },
+      grid: {
+        vertLines: { color: style.getPropertyValue("--line").trim() },
+        horzLines: { color: style.getPropertyValue("--line").trim() },
+      },
+      crosshair: {
+        mode: CrosshairMode.Magnet,
+        vertLine: {
+          color: style.getPropertyValue("--brand").trim(),
+          labelBackgroundColor: style.getPropertyValue("--brand").trim(),
+        },
+        horzLine: {
+          color: style.getPropertyValue("--brand").trim(),
+          labelBackgroundColor: style.getPropertyValue("--brand").trim(),
+        },
+      },
+      rightPriceScale: { borderColor: style.getPropertyValue("--line").trim() },
+      timeScale: { borderColor: style.getPropertyValue("--line").trim(), timeVisible: true },
+    });
+    chartRef.current = chart;
+
+    const closeSeries = chart.addSeries(LineSeries, {
+      color: "#0f766e",
+      lineWidth: 3,
+      priceLineVisible: false,
+      title: "종가",
+    });
+    const ma20Series = chart.addSeries(LineSeries, {
+      color: "#2563eb",
+      lineWidth: 2,
+      priceLineVisible: false,
+      title: "MA20",
+    });
+    const ma60Series = chart.addSeries(LineSeries, {
+      color: "#7c3aed",
+      lineWidth: 2,
+      priceLineVisible: false,
+      title: "MA60",
+    });
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      color: "rgba(15, 118, 110, 0.24)",
+      priceFormat: { type: "volume" },
+      priceScaleId: "",
+      title: "거래량",
+    });
+    volumeSeries.priceScale().applyOptions({ scaleMargins: { top: 0.76, bottom: 0 } });
+
+    closeSeries.setData(prices.map((point) => ({ time: point.date as Time, value: point.close })));
+    ma20Series.setData(toLineData(indicators.ma20));
+    ma60Series.setData(toLineData(indicators.ma60));
+    volumeSeries.setData(prices.map((point) => ({ time: point.date as Time, value: point.volume })));
+    chart.timeScale().fitContent();
+
+    const hoverRows = new Map(
+      prices.map((point, index) => [
+        point.date,
+        {
+          date: point.date,
+          close: point.close,
+          volume: point.volume,
+          ma20: indicators.ma20[index]?.value ?? null,
+          ma60: indicators.ma60[index]?.value ?? null,
+          rsi14: indicators.rsi14[index] ?? null,
+        },
+      ]),
+    );
+    const onMove = (param: MouseEventParams<Time>) => {
+      if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
+        setHover(null);
+        return;
+      }
+      const row = hoverRows.get(String(param.time));
+      if (!row) {
+        setHover(null);
+        return;
+      }
+      setHover({ x: param.point.x, y: param.point.y, ...row });
+    };
+    chart.subscribeCrosshairMove(onMove);
+
+    return () => {
+      chart.unsubscribeCrosshairMove(onMove);
+      chart.remove();
+      chartRef.current = null;
+    };
+  }, [analysis, dark]);
+
+  return (
+    <article className="chartCard">
+      <h3>최근 80거래일 종가</h3>
+      <div className="tradingChartWrap">
+        <div className="tradingCanvas" ref={ref} />
+        {hover ? <TechnicalTooltip hover={hover} /> : null}
+      </div>
+      <div className="legend">
+        <span><i style={{ background: "#0f766e" }} />종가</span>
+        <span><i style={{ background: "#2563eb" }} />MA20</span>
+        <span><i style={{ background: "#7c3aed" }} />MA60</span>
+        <span><i style={{ background: "rgba(15, 118, 110, 0.35)" }} />거래량</span>
+      </div>
+    </article>
+  );
+}
+
+function TechnicalTooltip({ hover }: { hover: TechnicalHover }) {
+  return (
+    <div className="chartHoverTooltip" style={{ left: Math.min(hover.x + 16, 520), top: Math.max(hover.y - 18, 8) }}>
+      <strong>{hover.date}</strong>
+      <span>종가 {num(hover.close)}원</span>
+      <span>거래량 {num(hover.volume)}</span>
+      <span>MA20 {num(hover.ma20)} / MA60 {num(hover.ma60)}</span>
+      <span>RSI {pct(hover.rsi14)}</span>
+    </div>
+  );
 }
 
 function makeTechnicalSeries(analysis: Analysis): ChartSeries {
@@ -484,6 +681,58 @@ function makeTechnicalSeries(analysis: Analysis): ChartSeries {
     labels,
     lines: [{ label: "종가", values: closes }],
   };
+}
+
+function buildTechnicalOverlay(prices: { date: string; close: number; volume: number }[]) {
+  const closes = prices.map((point) => point.close);
+  return {
+    ma20: movingAverage(prices, 20),
+    ma60: movingAverage(prices, 60),
+    rsi14: closes.map((_, index) => rsiAt(closes.slice(0, index + 1), 14)),
+  };
+}
+
+function movingAverage(prices: { date: string; close: number }[], period: number) {
+  return prices.map((point, index) => {
+    if (index < period - 1) return { time: point.date as Time, value: null };
+    const slice = prices.slice(index - period + 1, index + 1);
+    const value = Math.round(slice.reduce((sum, item) => sum + item.close, 0) / period);
+    return { time: point.date as Time, value };
+  });
+}
+
+function toLineData(points: { time: Time; value: number | null }[]) {
+  return points.filter((point): point is { time: Time; value: number } => point.value !== null);
+}
+
+function rsiAt(values: number[], period: number) {
+  if (values.length <= period) return null;
+  const changes = values.slice(1).map((value, index) => value - values[index]);
+  const recent = changes.slice(-period);
+  const gains = recent.filter((value) => value > 0).reduce((sum, value) => sum + value, 0) / period;
+  const losses = Math.abs(recent.filter((value) => value < 0).reduce((sum, value) => sum + value, 0) / period);
+  if (losses === 0) return 100;
+  return 100 - 100 / (1 + gains / losses);
+}
+
+function formatEchartsTooltip(series: ChartSeries, params: unknown) {
+  const rows = Array.isArray(params)
+    ? params as { axisValue?: string; marker?: string; seriesName?: string; value?: number | null }[]
+    : [];
+  const label = rows[0]?.axisValue ?? "";
+  const items = rows
+    .filter((row) => row.value !== null && row.value !== undefined)
+    .map((row) => `<div><span>${row.marker ?? ""}${row.seriesName}</span><b>${compactChartValue(row.value ?? null, series.unit)}</b></div>`)
+    .join("");
+  return `<section class="echartsTooltip"><strong>${label}</strong>${items}</section>`;
+}
+
+function compactChartValue(value: number | null | undefined, unit: ChartSeries["unit"]) {
+  if (value === null || value === undefined) return "미확인";
+  if (unit === "money") return money(value);
+  if (unit === "percent") return pct(value);
+  if (unit === "price") return `${num(value)}원`;
+  return num(value);
 }
 
 function LearnPage({ learning }: { learning: LearningItem[] }) {
